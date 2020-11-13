@@ -128,11 +128,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-.pptx
-.md
-.pdf
-.csv
-.pkl
+*.pptx
+*.md
+*.pdf
+*.csv
+*.pkl
 /.idea
 /Pickles
 /Data

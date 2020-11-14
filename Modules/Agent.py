@@ -1,9 +1,9 @@
-from typing import List, Dict
+from typing import List, Tuple, Dict
 from dataclasses import dataclass
 from utils import Location, CONFIG_PATH
 from utils import save_pickle_object
 import Area
-import DataGenerator
+from DataGenerator import DataGenerator
 import numpy as np
 from copy import deepcopy
 from configparser import ConfigParser
@@ -34,25 +34,41 @@ class Agent:
         :param verbose: True if want to show the probabilities map of the agent through the updates
         """
         t: int = 0
+        entropy_updates: List = []
+        information_gain_updates: List = []
         convergence_threshold: float = config['PARAMS'].getfloat('P_THRESHOLD')
         while not self._check_convergence(until_convergence=until_convergence,
-                                         convergence_threshold=convergence_threshold,
-                                         targets_locations=area.targets_locations):
-            for a, x, s in DataGenerator.DataGenerator.simulate_data(area=area, agent=self):
+                                          convergence_threshold=convergence_threshold,
+                                          targets_locations=area.targets_locations):
+            for a, x, s in DataGenerator.simulate_data(area=area, agent=self):
                 self._update_probability_of_target_existence(area=area, evidence=x)
-                print('Number of converged targets: {}'.format(
-                    len(np.where(np.array(list(self.p_S['t'])) > convergence_threshold)[0])))
-                print('t: {}; Targets Cells Probs: {}'.format(t, [(location, self.p_S['t'][location]) for location in
-                                                                  area.targets_locations]))
+                entropy, information_gain = self.calculate_metrics()
+                entropy_updates.append(entropy)
+                information_gain_updates.append(information_gain)
+
+                if verbose and t % 50 == 0 and t > 0:
+                    print('Number of converged targets: {}'.format(
+                        len(np.where(np.array(list(self.p_S['t'])) > convergence_threshold)[0])))
+                    print(
+                        't: {}; Targets Cells Probs: {}'.format(t, [(location, self.p_S['t'][location]) for location in
+                                                                    area.targets_locations]))
                 if verbose and t % 50 == 0 and t > 0:
                     self._plot_target_searching(area=area, t=t)
+                    self.done_convergence(area=area, t_end=t, entropy_updates=entropy_updates,
+                                          information_gain_updates=information_gain_updates)
                 t += 1
+        self.done_convergence(area=area, t_end=t, entropy_updates=entropy_updates,
+                              information_gain_updates=information_gain_updates)
 
-        print('\n*********** Convergence is Done ! t = {} ***********'.format(t))
+    def done_convergence(self, area: Area, t_end: int, entropy_updates: List[float],
+                         information_gain_updates: List[float]):
+        print('\n*********** Convergence is Done ! t = {} ***********'.format(t_end))
         print('Targets Cells Probabilities: {}'.format(
             [self.p_S['t'][location] for location in area.targets_locations]))
-        DataGenerator.DataGenerator.tabulate_matrix(self.p_S['t'])
+        DataGenerator.tabulate_matrix(self.p_S['t'])
+        self._plot_target_searching(area=area, t=t_end)
         save_pickle_object(obj_name='p_S_converged', obj=self.p_S['t'])
+        self.plot_metrics(entropy_updates, information_gain_updates)
 
     def _update_probability_of_target_existence(self, area: Area, evidence: np.array) -> None:
         """
@@ -78,7 +94,7 @@ class Agent:
         self.p_S['t'] = np.where(evidence == 1, update_if_x_is_1(p_S_t_minus_1), update_if_x_is_0(p_S_t_minus_1))
 
     def _check_convergence(self, until_convergence: bool, convergence_threshold: float,
-                          targets_locations: List[Location]) -> bool:
+                           targets_locations: List[Location]) -> bool:
         """
         Checking if the cells with the targets got convergence - the probability of the cells are bigger than P_THRESHOLD
         and that there is only 3 targets identified (No False Negative)
@@ -116,6 +132,37 @@ class Agent:
             _ = sns.heatmap(array, cmap=sns.cubehelix_palette(1000, hue=0.05, rot=0, light=0.9, dark=0), cbar=False,
                             ax=ax)
         plt.pause(0.000000000001)
+
+    def _calculate_entropy(self) -> float:
+        """
+        Calculate the entropy by each cell and summed through all the cells (N * N)
+        Maximum entropy is uniform (0.5, 0.5) -> entropy: 1 for each cell and summed to entropy of 1 * N * N
+        Adding very small const to the probabilities to ignore situation of log of 0 (not defined)
+        """
+        self.p_S['t'] = self.p_S['t'] + 0.0000000000000000000000001
+        return float(np.sum(-self.p_S['t'] * np.log2(self.p_S['t']) - (1 - self.p_S['t']) * np.log2(1 - self.p_S['t'])))
+
+    def _calculate_information_gain_KL(self) -> float:
+        """
+        Calculating the information gain by Kullback-Leibler divergence - the information gained between 2 timestamps -
+        What is the information this round (timestamp) contributed (distribution of "t-1" VS the distribution of "t")
+        """
+        return float(np.sum(self.p_S['t'] * (np.log(self.p_S['t'] / self.p_S['t-1']))))
+
+    def calculate_metrics(self) -> Tuple[float, float]:
+        entropy = self._calculate_entropy()
+        information_gain = self._calculate_information_gain_KL()
+        return entropy, information_gain
+
+    def plot_metrics(self, entropy_updates, information_gain_updates):
+        fig, ax = plt.subplots()
+        ax.plot(list(range(len(entropy_updates))), entropy_updates, label='Entropy')
+        ax.plot(list(range(len(information_gain_updates))), information_gain_updates, label='Information Gain')
+        ax.legend()
+        ax.set_title('Metrics Trough Time')
+        plt.xlabel('time (s)')
+        plt.ylabel('value')
+        plt.show()
 
     @staticmethod
     def get_p_S_from_initial_prior(prior: float, area: Area) -> Dict[str, np.array]:

@@ -35,7 +35,7 @@ class Agent:
         """
         t: int = 0
         convergence_threshold: float = config['PARAMS'].getfloat('P_THRESHOLD')
-        while not self.check_convergence(until_convergence=until_convergence,
+        while not self._check_convergence(until_convergence=until_convergence,
                                          convergence_threshold=convergence_threshold,
                                          targets_locations=area.targets_locations):
             for a, x, s in DataGenerator.DataGenerator.simulate_data(area=area, agent=self):
@@ -77,7 +77,7 @@ class Agent:
         self.p_S['t-1'] = deepcopy(self.p_S['t'])
         self.p_S['t'] = np.where(evidence == 1, update_if_x_is_1(p_S_t_minus_1), update_if_x_is_0(p_S_t_minus_1))
 
-    def check_convergence(self, until_convergence: bool, convergence_threshold: float,
+    def _check_convergence(self, until_convergence: bool, convergence_threshold: float,
                           targets_locations: List[Location]) -> bool:
         """
         Checking if the cells with the targets got convergence - the probability of the cells are bigger than P_THRESHOLD

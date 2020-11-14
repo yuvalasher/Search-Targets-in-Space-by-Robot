@@ -1,10 +1,10 @@
 from typing import List, Dict
 from dataclasses import dataclass
 from utils import Location, CONFIG_PATH
+from utils import save_pickle_object
 import Area
 import DataGenerator
 import numpy as np
-import pickle
 from copy import deepcopy
 from configparser import ConfigParser
 import seaborn as sns
@@ -35,12 +35,9 @@ class Agent:
         """
         t: int = 0
         convergence_threshold: float = config['PARAMS'].getfloat('P_THRESHOLD')
-        if until_convergence:
-            stop_criterion: bool = not self.check_convergence(convergence_threshold=convergence_threshold,
-                                                              targets_locations=area.targets_locations)
-        else:
-            stop_criterion: bool = True
-        while stop_criterion:
+        while not self.check_convergence(until_convergence=until_convergence,
+                                         convergence_threshold=convergence_threshold,
+                                         targets_locations=area.targets_locations):
             for a, x, s in DataGenerator.DataGenerator.simulate_data(area=area, agent=self):
                 self._update_probability_of_target_existence(area=area, evidence=x)
                 print('Number of converged targets: {}'.format(
@@ -55,7 +52,7 @@ class Agent:
         print('Targets Cells Probabilities: {}'.format(
             [self.p_S['t'][location] for location in area.targets_locations]))
         DataGenerator.DataGenerator.tabulate_matrix(self.p_S['t'])
-        self.save_pickle_object(obj_name='p_S_converged', obj=self.p_S['t'])
+        save_pickle_object(obj_name='p_S_converged', obj=self.p_S['t'])
 
     def _update_probability_of_target_existence(self, area: Area, evidence: np.array) -> None:
         """
@@ -63,12 +60,13 @@ class Agent:
         Evidence is the X matrix (NXN)
         evidence: The signal received from a cell (x(ci,t)). A signal can be True Alarm (TA) or False Alarm (FA)
         """
+
         def update_if_x_is_1(p_S_t_minus_1):
             p_S_t_minus_1_ta = p_S_t_minus_1 * area.pta
             return (p_S_t_minus_1_ta) / (p_S_t_minus_1_ta + (1 - p_S_t_minus_1) * area.alpha * area.pta)
 
         def update_if_x_is_0(p_S_t_minus_1):
-            p_x_receive_signal = self._calculate_probability_of_agent_receiving_signal_from_cell(area=area)
+            p_x_receive_signal = self.calculate_probability_of_agent_receiving_signal_from_cell(area=area)
             numerator = p_S_t_minus_1 * ((1 - area.pta) + area.pta * (1 - p_x_receive_signal))
             denominator = numerator + (1 - p_S_t_minus_1) * (
                     (1 - area.alpha * area.pta) + area.alpha * area.pta * (
@@ -79,7 +77,8 @@ class Agent:
         self.p_S['t-1'] = deepcopy(self.p_S['t'])
         self.p_S['t'] = np.where(evidence == 1, update_if_x_is_1(p_S_t_minus_1), update_if_x_is_0(p_S_t_minus_1))
 
-    def check_convergence(self, convergence_threshold: float, targets_locations: List[Location]) -> bool:
+    def check_convergence(self, until_convergence: bool, convergence_threshold: float,
+                          targets_locations: List[Location]) -> bool:
         """
         Checking if the cells with the targets got convergence - the probability of the cells are bigger than P_THRESHOLD
         and that there is only 3 targets identified (No False Negative)
@@ -87,12 +86,15 @@ class Agent:
         pta=1, alpha = 0.5 -> t=145)
         :return: True if all the target cells' probability is bigger than the convergence threshold else False
         """
+        if not until_convergence:
+            return False
         targets_locations_probs = [self.p_S['t'][location] for location in targets_locations]
-        return True if len(np.where(np.array(targets_locations_probs) > convergence_threshold)[0]) == len(
-            targets_locations) and len(np.where(np.array(list(self.p_S['t'])) > convergence_threshold)[0]) == len(
-            targets_locations) else False
+        num_of_targets_converged = len(np.where(np.array(targets_locations_probs) > convergence_threshold)[0])
+        num_of_converged_cells = len(np.where(np.array(list(self.p_S['t'])) > convergence_threshold)[0])
+        return False if (num_of_targets_converged != len(targets_locations) or num_of_converged_cells != len(
+            targets_locations)) else True
 
-    def _calculate_probability_of_agent_receiving_signal_from_cell(self, area: Area) -> np.array:
+    def calculate_probability_of_agent_receiving_signal_from_cell(self, area: Area) -> np.array:
         """
         Calculate P(X(ci, t)) based on the Pta, P(S(ci,t-1)), alpha
         This function will be run by main num_cells times
@@ -122,13 +124,3 @@ class Agent:
         """
         return {'t': np.full((area.num_cells_axis, area.num_cells_axis), prior),
                 't-1': np.full((area.num_cells_axis, area.num_cells_axis), prior)}
-
-    @staticmethod
-    def save_pickle_object(obj_name: str, obj: object):
-        with open('Pickles/{}.pkl'.format(obj_name), 'wb') as f:
-            pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
-
-    @staticmethod
-    def load_pickle_object(obj_name: str):
-        with open('Pickles/{}.pkl'.format(obj_name), 'rb') as f:
-            return pickle.load(f)

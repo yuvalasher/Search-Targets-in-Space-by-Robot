@@ -26,5 +26,5 @@ if __name__ == '__main__':
     agent = Agent(current_location=eval(params['AGENT_POSITION']), lambda_strength=params.getint('LAMBDA_SENSOR'),
                   p_S=Agent.get_p_S_from_initial_prior(prior=params.getfloat('INITIAL_PRIOR_P'), area=area))
 
-    agent.bayesian_update(area=area, until_convergence=True, verbose=True)
+    agent.bayesian_update(area=area, until_convergence=False, verbose=True)
     print('Bayesian Updating Done in {}'.format(dt.now() - start_time))

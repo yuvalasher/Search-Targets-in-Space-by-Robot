@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 config = ConfigParser()
 config.read(CONFIG_PATH)
 N = config['PARAMS'].getint('N')
-
 sns.set(rc={'figure.figsize': (7.7, 4.27)})
 
 
@@ -54,8 +53,6 @@ class Agent:
                                                                     area.targets_locations]))
                 if verbose and t % 50 == 0 and t > 0:
                     self._plot_target_searching(area=area, t=t)
-                    self.done_convergence(area=area, t_end=t, entropy_updates=entropy_updates,
-                                          information_gain_updates=information_gain_updates)
                 t += 1
         self.done_convergence(area=area, t_end=t, entropy_updates=entropy_updates,
                               information_gain_updates=information_gain_updates)
@@ -147,7 +144,7 @@ class Agent:
         Calculating the information gain by Kullback-Leibler divergence - the information gained between 2 timestamps -
         What is the information this round (timestamp) contributed (distribution of "t-1" VS the distribution of "t")
         """
-        return float(np.sum(self.p_S['t'] * (np.log(self.p_S['t'] / self.p_S['t-1']))))
+        return float(np.sum(self.p_S['t'] * (np.log2(self.p_S['t'] / self.p_S['t-1']))))
 
     def calculate_metrics(self) -> Tuple[float, float]:
         entropy = self._calculate_entropy()

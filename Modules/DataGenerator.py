@@ -63,7 +63,7 @@ class DataGenerator:
         """
         Generates num_values data points of the Bernoulli distribution with probability p
         Used for experiment of existence of the agents in the Area, sending true alarm (pta) & false alarm(pfa)
-        if num_values not supplied, will produce one sample as int
+        if num_values not suppliedא, will produce one sample as int
         :return: List with length of num_values with values 0 or 1 by the experiment result
         """
         if num_values:
@@ -72,4 +72,4 @@ class DataGenerator:
 
     @staticmethod
     def tabulate_matrix(matrix: np.array):
-        print(tabulate(matrix, headers=[*list(range(config['PARAMS'].getint('N')))], tablefmt='github'))
+        print(tabulate(matrix, headers=[*list(range(config['PARAMS'].getint('N')))], tablefmt='github', showindex=True))

@@ -8,7 +8,6 @@ config = ConfigParser()
 config.read(CONFIG_PATH)
 np.random.seed(config['UTILS'].getint(('SEED')))
 
-
 @dataclass
 class Area:
     """
@@ -44,9 +43,10 @@ class Area:
             cells_indices[1] - np.array([agent_location[0]]), 2))
 
     @staticmethod
-    def generate_targets(cells_locations: List[Location], num_targets: int) -> List[Location]:
+    def generate_targets(num_targets: int) -> List[Location]:
         """
         Randomize num_targets cells
+        TODO - Need to make it with np.random.choice without repeat
         """
-        return [(np.random.randint(len(cells_locations)), np.random.randint(len(cells_locations))) for _ in
+        return [(np.random.randint(config['PARAMS'].getint('N')), np.random.randint(config['PARAMS'].getint('N'))) for _ in
                 range(num_targets)]

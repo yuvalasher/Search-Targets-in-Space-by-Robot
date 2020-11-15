@@ -15,8 +15,6 @@ config.read(CONFIG_PATH)
 N = config['PARAMS'].getint('N')
 sns.set(rc={'figure.figsize': (7.7, 4.27)})
 
-from dataclasses import field
-
 
 @dataclass
 class Agent:
@@ -27,8 +25,8 @@ class Agent:
     current_location: Location
     lambda_strength: float
     p_S: Dict[str, np.array]
-    entropy_updates: List[float]# = field(init=True, default_factory=[])
-    information_gain_updates: List[float]# = field(init=True, default_factory=[])
+    entropy_updates: List[float]
+    information_gain_updates: List[float]
 
     def bayesian_update(self, area: Area, until_convergence: bool = True, verbose: bool = False) -> None:
         """

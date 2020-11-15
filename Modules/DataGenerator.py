@@ -21,7 +21,6 @@ class DataGenerator:
     Responsible to generate data for all the variables
     :param path: The Location of the data will be written to
     """
-    csv_path: Path
 
     @staticmethod
     def param_validation(params: configparser.SectionProxy) -> None:
@@ -63,7 +62,7 @@ class DataGenerator:
         """
         Generates num_values data points of the Bernoulli distribution with probability p
         Used for experiment of existence of the agents in the Area, sending true alarm (pta) & false alarm(pfa)
-        if num_values not suppliedא, will produce one sample as int
+        if num_values not supplied, will produce one sample as int
         :return: List with length of num_values with values 0 or 1 by the experiment result
         """
         if num_values:

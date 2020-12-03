@@ -27,18 +27,32 @@ class Agent:
     p_S: Dict[str, np.array]
     entropy_updates: List[float]
     information_gain_updates: List[float]
+    converge_iter: int
+    p_S_history: List[np.array]
 
-    def bayesian_update(self, area: Area, until_convergence: bool = True, verbose: bool = False) -> None:
+    def bayesian_update(self, area: Area, until_convergence: bool = True, verbose: bool = False, stop_after_iteration: int = 1000) -> None:
         """
         Running the bayesian updating on a given matrix generated from generator until convergence
         :param until_convergence: Run updating until convergence of all the targets (and only them) or until infinity (searching targets all the tine)
         :param verbose: True if want to show the probabilities map of the agent through the updates
         """
         t: int = 0
+        converge_status = False
+        converged = False
         convergence_threshold: float = config['PARAMS'].getfloat('P_THRESHOLD')
-        while not self._check_convergence(until_convergence=until_convergence,
-                                          convergence_threshold=convergence_threshold,
-                                          targets_locations=area.targets_locations):
+        while not converge_status:
+
+            self.p_S_history.append(self.p_S["t"])
+            if self._check_convergence(until_convergence=until_convergence,
+                                    convergence_threshold=convergence_threshold,
+                                    targets_locations=area.targets_locations):
+
+                if not converged:
+                    self.converge_iter = t
+                    converged = True
+                if until_convergence:
+                    converge_status = True
+
             for a, x, s in DataGenerator.simulate_data(area=area, agent=self):
                 self._update_probability_of_target_existence(area=area, evidence=x)
                 self._calculate_metrics()
@@ -49,11 +63,12 @@ class Agent:
                     print(
                         't: {}; Targets Cells Probs: {}'.format(t, [(location, self.p_S['t'][location]) for location in
                                                                     area.targets_locations]))
-                if verbose and t % 50 == 0 and t > 0:
-                    self._plot_target_searching(area=area, t=t)
+                # if verbose and t % 50 == 0 and t > 0:
+                    # self._plot_target_searching(area=area, t=t)
                     # self._plot_metrics(t=t)
-
                 t += 1
+            if t >= stop_after_iteration:
+                break
         self._done_convergence(area=area, t_end=t)
 
     def _done_convergence(self, area: Area, t_end: int):
@@ -61,7 +76,7 @@ class Agent:
         print('Targets Cells Probabilities: {}'.format(
             [self.p_S['t'][location] for location in area.targets_locations]))
         DataGenerator.tabulate_matrix(self.p_S['t'])
-        self._plot_target_searching(area=area, t=t_end)
+        # self._plot_target_searching(area=area, t=t_end)
         # self._plot_metrics(t=t_end)
         save_pickle_object(obj_name='p_S_converged', obj=self.p_S['t'])
 
@@ -97,8 +112,8 @@ class Agent:
         pta=1, alpha = 0.5 -> t=145)
         :return: True if all the target cells' probability is bigger than the convergence threshold else False
         """
-        if not until_convergence:
-            return False
+        # if not until_convergence:
+        #     return False
         targets_locations_probs = [self.p_S['t'][location] for location in targets_locations]
         num_of_targets_converged = len(np.where(np.array(targets_locations_probs) > convergence_threshold)[0])
         num_of_converged_cells = len(np.where(np.array(list(self.p_S['t'])) > convergence_threshold)[0])
@@ -134,29 +149,39 @@ class Agent:
         Maximum entropy is uniform (0.5, 0.5) -> entropy: 1 for each cell and summed to entropy of 1 * N * N
         Adding very small const to the probabilities to ignore situation of log of 0 (not defined)
         """
-        self.p_S['t'] = self.p_S['t'] + 0.0000000000000000000000001
-        return float(np.sum(-self.p_S['t'] * np.log2(self.p_S['t']) - (1 - self.p_S['t']) * np.log2(1 - self.p_S['t'])))
+        noise = 0.00000001
+        # self.p_S['t'] = self.p_S['t'] + 0.0000000000000000000000001
+        return float(np.sum(-self.p_S['t'] * np.log2((self.p_S['t'] + noise)) - (1 - (self.p_S['t'] - noise)) * np.log2(1 - (self.p_S['t'] - noise))))
 
     def _calculate_information_gain_KL(self) -> float:
         """
         Calculating the information gain by Kullback-Leibler divergence - the information gained between 2 timestamps -
         What is the information this round (timestamp) contributed (distribution of "t-1" VS the distribution of "t")
         """
-        return float(np.sum(self.p_S['t'] * (np.log2(self.p_S['t'] / self.p_S['t-1']))))
+        noise = 0.00000001
+        return float(np.sum(self.p_S['t'] * (np.log2((self.p_S['t'] + noise) / (self.p_S['t-1'] + noise))) +
+                            (1 - self.p_S['t']) * (np.log2((1 - (self.p_S['t'] - noise)) / (1 - (self.p_S['t-1'] - noise))))))
 
     def _calculate_metrics(self) -> None:
         self.entropy_updates.append(self._calculate_entropy())
         self.information_gain_updates.append(self._calculate_information_gain_KL())
 
-    def get_metrics(self) -> Tuple[List[float], List[float]]:
-        return self.entropy_updates, self.information_gain_updates
+    def get_metrics(self) -> Tuple[List[float], List[float], int]:
+        return self.entropy_updates, self.information_gain_updates, self.converge_iter
+
+    def get_prob_history(self, location) -> List[float]:
+
+        ret_prob = []
+        for t in range(len(self.p_S_history)):
+            ret_prob.append(self.p_S_history[t][location])
+        return ret_prob
 
     def _plot_metrics(self, t:int):
         fig, ax = plt.subplots()
         ax.plot(list(range(len(self.entropy_updates))), self.entropy_updates, label='Entropy')
         ax.plot(list(range(len(self.information_gain_updates))), self.information_gain_updates, label='Information Gain')
         ax.legend()
-        ax.set_title('Metrics Trough Time - t: {}'.format(t))
+        ax.set_title('Metrics Through Time - t: {}'.format(t))
         plt.xlabel('time (s)')
         plt.ylabel('value')
         plt.show()

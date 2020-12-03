@@ -14,3 +14,5 @@ def save_pickle_object(obj_name: str, obj: object):
 def load_pickle_object(obj_name: str):
     with open('Pickles/{}.pkl'.format(obj_name), 'rb') as f:
         return pickle.load(f)
+
+NOISE = 1e-8

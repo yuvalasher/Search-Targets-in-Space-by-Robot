@@ -132,6 +132,7 @@ dmypy.json
 *.md
 *.pdf
 *.csv
+*.docx
 *.pkl
 /.idea
 /Pickles

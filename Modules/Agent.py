@@ -1,7 +1,7 @@
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
 from utils import Location, CONFIG_PATH
-from utils import save_pickle_object
+from utils import save_pickle_object, NOISE
 import Area
 from DataGenerator import DataGenerator
 import numpy as np
@@ -141,7 +141,7 @@ class Agent:
             ax.set_title('{} - t: {}'.format(array_name, t))
             _ = sns.heatmap(array, cmap=sns.cubehelix_palette(1000, hue=0.05, rot=0, light=0.9, dark=0), cbar=False,
                             ax=ax)
-        plt.pause(0.000000000001)
+        plt.pause(1e-12)
 
     def _calculate_entropy(self) -> float:
         """
@@ -149,18 +149,15 @@ class Agent:
         Maximum entropy is uniform (0.5, 0.5) -> entropy: 1 for each cell and summed to entropy of 1 * N * N
         Adding very small const to the probabilities to ignore situation of log of 0 (not defined)
         """
-        noise = 0.00000001
-        # self.p_S['t'] = self.p_S['t'] + 0.0000000000000000000000001
-        return float(np.sum(-self.p_S['t'] * np.log2((self.p_S['t'] + noise)) - (1 - (self.p_S['t'] - noise)) * np.log2(1 - (self.p_S['t'] - noise))))
+        return float(np.sum(-self.p_S['t'] * np.log2((self.p_S['t'] + NOISE)) - (1 - (self.p_S['t'] - NOISE)) * np.log2(1 - (self.p_S['t'] - NOISE))))
 
     def _calculate_information_gain_KL(self) -> float:
         """
         Calculating the information gain by Kullback-Leibler divergence - the information gained between 2 timestamps -
         What is the information this round (timestamp) contributed (distribution of "t-1" VS the distribution of "t")
         """
-        noise = 0.00000001
-        return float(np.sum(self.p_S['t'] * (np.log2((self.p_S['t'] + noise) / (self.p_S['t-1'] + noise))) +
-                            (1 - self.p_S['t']) * (np.log2((1 - (self.p_S['t'] - noise)) / (1 - (self.p_S['t-1'] - noise))))))
+        return float(np.sum(self.p_S['t'] * (np.log2((self.p_S['t'] + NOISE) / (self.p_S['t-1'] + NOISE))) +
+                            (1 - self.p_S['t']) * (np.log2((1 - (self.p_S['t'] - NOISE)) / (1 - (self.p_S['t-1'] - NOISE))))))
 
     def _calculate_metrics(self) -> None:
         self.entropy_updates.append(self._calculate_entropy())

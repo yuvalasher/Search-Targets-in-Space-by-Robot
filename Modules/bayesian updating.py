@@ -7,12 +7,12 @@ from datetime import datetime as dt
 import matplotlib.pyplot as plt
 import numpy as np
 import random
-
+from typing import Dict, Any
 config = ConfigParser()
 config.read(CONFIG_PATH)
 
 
-def bayesian_updating_iteration(params, until_convergence=True):
+def bayesian_updating_iteration(params, until_convergence: bool=True):
 
     start_time = dt.now()
     DataGenerator.param_validation(params=params)
@@ -34,24 +34,23 @@ def bayesian_updating_iteration(params, until_convergence=True):
     agent.bayesian_update(area=area, until_convergence=until_convergence, verbose=True, stop_after_iteration=200)
     print('Bayesian Updating Done in {}'.format(dt.now() - start_time))
 
-    # Sensitivity analysis changes
-    target_prob = agent.get_prob_history(targets_locations[2])
-    # non_target_loc = random.choice([loc for loc in zip(range(params.getint('N')), range(params.getint('N'))) if loc not in targets_locations])
-    # Randomly selected non targets
-    list_of_loc = [(9, 10), (7, 15), (1, 16)]
-    agent_pos = eval(params['AGENT_POSITION'])
-    non_target_prob = {}
-    for loc in list_of_loc:
-        dist = np.round(np.sqrt(np.power(loc[0] - agent_pos[0], 2) + np.power(loc[1] - agent_pos[1], 2)))
-        non_target_prob[dist] = agent.get_prob_history(loc)
-
-    ent_upd, info_gain_upd, conv_iter  = agent.get_metrics()
-
-    return ent_upd, info_gain_upd, conv_iter, target_prob, non_target_prob
+    # # Sensitivity analysis changes
+    # target_prob = agent.get_prob_history(targets_locations[2])
+    # # non_target_loc = random.choice([loc for loc in zip(range(params.getint('N')), range(params.getint('N'))) if loc not in targets_locations])
+    # # Randomly selected non targets
+    # list_of_loc = [(9, 10), (7, 15), (1, 16)]
+    # agent_pos = eval(params['AGENT_POSITION'])
+    # non_target_prob = {}
+    # for loc in list_of_loc:
+    #     dist = np.round(np.sqrt(np.power(loc[0] - agent_pos[0], 2) + np.power(loc[1] - agent_pos[1], 2)))
+    #     non_target_prob[dist] = agent.get_prob_history(loc)
+    #
+    # ent_upd, info_gain_upd, conv_iter  = agent.get_metrics()
+    #
+    # return ent_upd, info_gain_upd, conv_iter, target_prob, non_target_prob
 
 
 def sensitivity(param_name, values):
-
     info_gain_res = {}
     ent_res = {}
     convergence_iter = {}
@@ -141,7 +140,6 @@ def plot_targ_non_targ_prob():
 
 
 def plot_info_gain_and_entropy():
-
     params = config["PARAMS"]
     ent_upd, info_gain_upd, conv_iter, t_pron, non_t_prob = bayesian_updating_iteration(params)
 
@@ -160,9 +158,11 @@ def plot_info_gain_and_entropy():
     plt.show()
 
 if __name__ == '__main__':
+    params = config["PARAMS"]
+    bayesian_updating_iteration(params=params, until_convergence=True)
     # alpha_sensitivity()
     # sensor_power_sens()
     # pta_sens()
     # distance_from_center_sens()
-    plot_targ_non_targ_prob()
+    # plot_targ_non_targ_prob()
     # plot_info_gain_and_entropy()

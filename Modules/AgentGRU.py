@@ -1,12 +1,14 @@
 import torch
 from torch import nn
 from torch.nn.modules import loss
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from typing import Tuple, Dict, Any
 import numpy as np
 from tqdm import tqdm
-from utils import load_hdf5_file, PRINT_EVERY, SAVE_EVERY, plot_values_by_epochs, check_earlystopping, \
-    calculate_metrics, load_X_y_from_disk, _split_to_train_validation_test, get_dataloader_for_datasets
+from utils import load_hdf5_file, plot_values_by_epochs, check_earlystopping, calculate_metrics, load_X_y_from_disk, \
+    _split_to_train_validation_test, get_dataloader_for_datasets
+
+from consts import NUM_EPOCHS, train_ratio, validation_ratio, test_ratio, hidden_dim, num_layers, lr, batch_size, PRINT_EVERY, SAVE_EVERY
 
 train_on_gpu = torch.cuda.is_available()
 
@@ -154,16 +156,7 @@ if __name__ == '__main__':
     Usage of focal loss - https://discuss.pytorch.org/t/is-this-a-correct-implementation-for-focal-loss-in-pytorch/43327/6
     Try to use bidirectional model
     """
-    NUM_EPOCHS: int = 5
-    train_ratio: float = 0.7
-    validation_ratio: float = 0.15
-    test_ratio: float = 0.15
-    hidden_dim: int = 32
-    num_layers: int = 2
-    lr: float = 1e-3
-    batch_size: int = 256
-
-    X, y = load_X_y_from_disk(num_features=1, max_size=1000)
+    X, y = load_X_y_from_disk(num_features=1)
     x_train, x_val, x_test, y_train, y_val, y_test = _split_to_train_validation_test(X=X, y=y,
                                                                                      train_ratio=train_ratio,
                                                                                      validation_ratio=validation_ratio)

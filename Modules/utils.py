@@ -1,5 +1,4 @@
 from typing import Tuple, Any
-from pathlib import Path
 import pickle
 import h5py
 import os
@@ -9,17 +8,7 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, confusion_matrix
-
-Location = Tuple[int, int]
-CONFIG_PATH: Path = Path('config.cfg')
-NOISE: float = 1e-8
-PRINT_EVERY: int = 1
-SAVE_EVERY: int = 5
-FILES_PATH = r"C:\Users\asher\OneDrive\Documents\Data Science Degree\3th Year\Curiosity\Search-Targets-in-Space-by-Robot\Modules"
-
-# Early Stopping Params
-MIN_IMPROVEMENT: float = 1e-3
-PATIENT_NUM_EPOCHS: int = 10
+from consts import FILES_PATH, MIN_IMPROVEMENT, PATIENT_NUM_EPOCHS
 
 
 def save_pickle_object(obj_name: str, obj: Any) -> None:
@@ -60,8 +49,6 @@ def check_earlystopping(loss: np.array, epoch: int, min_improvement: float = MIN
     if epoch > patient_num_epochs:
         return np.sum(np.where((loss[epoch - 1 - patient_num_epochs:epoch - 1] -
                                 loss[epoch - patient_num_epochs:epoch]) >= min_improvement, 1, 0)) == 0
-
-
 
 
 def convert_probs_to_preds(probs: np.array, threshold: float = 0.7) -> np.array:

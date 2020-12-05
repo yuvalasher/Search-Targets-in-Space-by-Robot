@@ -4,17 +4,28 @@ from torch.nn.modules import loss
 from torch.utils.data import DataLoader, Dataset
 from typing import Tuple, Dict, Any
 import numpy as np
-from utils import load_hdf5_file, PRINT_EVERY, plot_values_by_epochs
 from tqdm import tqdm
+from utils import load_hdf5_file, PRINT_EVERY, SAVE_EVERY, plot_values_by_epochs, check_earlystopping, \
+    calculate_metrics, load_X_y_from_disk, _split_to_train_validation_test, get_dataloader_for_datasets
 
 train_on_gpu = torch.cuda.is_available()
 
 
+def save_pt_model(net: nn.Module) -> None:
+    torch.save(net.state_dict(), 'Models/GRU_weights.pt')
+
+
+def load_pt_model(input_size: int, hidden_dim: int, output_dim: int, num_layers: int = 2,
+                  model_name: str = 'GRU_weights') -> nn.Module:
+    net = AgentGRU(input_size=input_size, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers)
+    net.load_state_dict(torch.load(f'Models/{model_name}.pt'))
+    return net
+
+
 class AgentGRU(nn.Module):
-    def __init__(self, seq_len: int, input_size: int, hidden_dim: int, output_dim: int = 1, num_layers: int = 2,
+    def __init__(self, input_size: int, hidden_dim: int, output_dim: int, num_layers: int = 2,
                  dropout_prob: float = 0.5):
         super(AgentGRU, self).__init__()
-        self.seq_len = seq_len
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
 
@@ -51,7 +62,7 @@ class AgentGRU(nn.Module):
 
 
 def train(net: nn.Module, train_dataloader: DataLoader = None, val_dataloader: DataLoader = None,
-          test_dataloader: DataLoader = None) -> nn.Module:
+          test_dataloader: DataLoader = None, is_earlystopping: bool = True) -> nn.Module:
     """
     Training loop iterating on the train dataloader and updating the model's weights.
     Inferring the validation dataloader & test dataloader, if given, to babysit the learning
@@ -62,6 +73,7 @@ def train(net: nn.Module, train_dataloader: DataLoader = None, val_dataloader: D
     test_losses: np.array = np.zeros(NUM_EPOCHS)
     val_losses: np.array = np.zeros(NUM_EPOCHS)
     hidden_list: list = []
+    best_epoch: int = NUM_EPOCHS - 1
 
     if test_dataloader:
         untrained_test_loss = infer(net, test_dataloader, loss_fn)
@@ -92,11 +104,29 @@ def train(net: nn.Module, train_dataloader: DataLoader = None, val_dataloader: D
             if test_dataloader:
                 test_losses[epoch] = infer(net, test_dataloader, loss_fn)
 
+            if is_earlystopping and check_earlystopping(loss=val_losses, epoch=epoch):
+                print('EarlyStopping !!!')
+                best_epoch = np.argmin(val_losses[:epoch + 1])
+                break
+
         if epoch % PRINT_EVERY == 0:
             print(f"Epoch: {epoch + 1}/{NUM_EPOCHS},",
-                  f"Train loss: {train_losses[epoch]:.4f},",
-                  f"Validation loss: {val_losses[epoch]:.4f}")
-            print(f"Test Loss: {test_losses[epoch]:.2f}" if test_dataloader else '')
+                  f"Train loss: {train_losses[epoch]:.5f},",
+                  f"Validation loss: {val_losses[epoch]:.5f}")
+            print(f"Test Loss: {test_losses[epoch]:.5f}" if test_dataloader else '')
+
+        if epoch % SAVE_EVERY == 0:
+            save_pt_model(net=net)
+
+    if best_epoch != NUM_EPOCHS - 1:  # earlystopping NOT activated
+        train_losses = train_losses[:best_epoch + 1]
+        val_losses = val_losses[:best_epoch + 1]
+        test_losses = test_losses[:best_epoch + 1]
+    else:
+        best_epoch = np.argmin(val_losses)
+    # accuracy, recall, precision, f1score = calculate_metrics()
+    print(
+        f'Best Epoch: {best_epoch}; Best Validation Loss: {val_losses[best_epoch]:.4f} -> Test Loss: {test_losses[best_epoch]:.4f}')
     plot_values_by_epochs(train_values=train_losses, validation_values=val_losses)
     return net
 
@@ -109,68 +139,14 @@ def infer(net: nn.Module, infer_dataloader: DataLoader, loss_fn: loss) -> float:
     """
     net.eval()
     running_loss = 0
-    for x, y in test_dataloader:
+    for x, y in infer_dataloader:
         with torch.no_grad():
             if train_on_gpu:
                 x, y = x.cuda(), y.cuda()
             y_pred, hidden = net(x)
-            infer_loss = loss_fn(input=y_pred.reshape(-1), target=y.reshape(-1))
+            infer_loss = loss_fn(input=np.clip(y_pred.reshape(-1), a_min=0, a_max=1), target=y.reshape(-1))
         running_loss += infer_loss
     return running_loss / len(infer_dataloader)
-
-
-class TargetsDataset(Dataset):
-    """
-    The dataset object used to read the data
-    """
-
-    def __init__(self, features: np.array, labels: np.array):
-        assert features.shape[0] == labels.shape[0]
-        self.features = torch.Tensor(features).to(torch.float32)
-        self.labels = torch.Tensor(labels).to(torch.float32)
-
-    def __getitem__(self, idx):
-        return self.features[idx, :].float(), self.labels[idx, :].float()
-
-    def __len__(self):
-        return self.labels.shape[0]
-
-
-def load_X_y_from_disk(num_features: int = 2) -> Tuple[np.array, np.array]:
-    """
-    :param num_features: Decide if taking all the features of just the first (X vector)
-    """
-    X, y = load_hdf5_file('X'), load_hdf5_file('y')
-    if num_features == 1:
-        X = X[:, :, :, 0]
-    return X, y
-
-
-def _split_to_train_validation_test(X: np.array, y: np.array, train_ratio: float = 0.7,
-                                    validation_ratio: float = 0.15) -> \
-        Tuple[np.array, np.array, np.array, np.array, np.array, np.array]:
-    """
-    Splitting the data based on the ratio of the different types of data (train, validation, test)
-    :param X: The signals received from the cells. Shape: (seq_len, num_cells)
-    :param y: The ground truth label of existence of targets in cells. Shape: (N * N,)
-    :return: X, y for each dataset type (train, validation, test)
-    """
-    num_sequences = X.shape[0]
-    train_len = int(np.ceil(num_sequences * train_ratio))
-    validation_len = int(np.ceil(num_sequences * validation_ratio))
-    return X[:train_len], X[train_len:train_len + validation_len], X[train_len + validation_len:], y[:train_len], \
-           y[train_len:train_len + validation_len], y[train_len + validation_len:]
-
-
-def get_dataloader_for_datasets(x_train: np.array, x_val: np.array, x_test: np.array, y_train: np.array,
-                                y_val: np.array, y_test: np.array) -> Tuple[DataLoader, DataLoader, DataLoader]:
-    """
-    The length of the data-loaders are number of samples in X divided to batch size (X.shape[0] / batch_size))
-    """
-    train_dataloader = DataLoader(TargetsDataset(features=x_train, labels=y_train), batch_size=batch_size)
-    val_dataloader = DataLoader(TargetsDataset(features=x_val, labels=y_val), batch_size=batch_size)
-    test_dataloader = DataLoader(TargetsDataset(features=x_test, labels=y_test), batch_size=batch_size)
-    return train_dataloader, val_dataloader, test_dataloader
 
 
 if __name__ == '__main__':
@@ -178,7 +154,7 @@ if __name__ == '__main__':
     Usage of focal loss - https://discuss.pytorch.org/t/is-this-a-correct-implementation-for-focal-loss-in-pytorch/43327/6
     Try to use bidirectional model
     """
-    NUM_EPOCHS: int = 50
+    NUM_EPOCHS: int = 5
     train_ratio: float = 0.7
     validation_ratio: float = 0.15
     test_ratio: float = 0.15
@@ -187,7 +163,7 @@ if __name__ == '__main__':
     lr: float = 1e-3
     batch_size: int = 256
 
-    X, y = load_X_y_from_disk(num_features=1)
+    X, y = load_X_y_from_disk(num_features=1, max_size=1000)
     x_train, x_val, x_test, y_train, y_val, y_test = _split_to_train_validation_test(X=X, y=y,
                                                                                      train_ratio=train_ratio,
                                                                                      validation_ratio=validation_ratio)
@@ -198,17 +174,13 @@ if __name__ == '__main__':
     seq_len: int = x_train.shape[1]
     input_dim: int = x_train.shape[2]
     output_dim: int = x_train.shape[2]
-    # print(x_train.shape, x_val.shape, x_test.shape, y_train.shape, y_val.shape, y_test.shape)
 
-    net = AgentGRU(seq_len=seq_len, input_size=input_dim, hidden_dim=hidden_dim, output_dim=output_dim,
-                   num_layers=num_layers)
+    net = AgentGRU(input_size=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers)
     optimizer = torch.optim.Adam(params=net.parameters(), lr=lr, weight_decay=1e-3)
     loss_fn = nn.BCELoss()
 
     print(net)
-    params: Dict[str, Any] = {'epochs': NUM_EPOCHS, 'hidden_dim': hidden_dim, 'input_dim': input_dim,
-                              'num_layers': num_layers,
-                              'Number of Features': x_train.shape[-1]}
     net = train(net=net, train_dataloader=train_dataloader, val_dataloader=val_dataloader,
-                test_dataloader=test_dataloader)
+                test_dataloader=test_dataloader, is_earlystopping=True)
     print(f'Final Test Loss: {infer(net=net, infer_dataloader=test_dataloader, loss_fn=loss_fn):.2f}')
+    save_pt_model(net=net)

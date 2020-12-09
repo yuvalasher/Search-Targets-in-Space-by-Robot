@@ -93,7 +93,7 @@ def train(net: nn.Module, train_dataloader: DataLoader = None, val_dataloader: D
             hidden = hidden.data
             hidden_list.append(hidden)
 
-            train_loss = loss_fn(y_train_pred, y_train)
+            train_loss = loss_fn(torch.clamp(y_train_pred, min=0, max=1), y_train)
             train_losses[epoch] = train_loss.item() / len(train_dataloader)
 
             optimizer.zero_grad()
@@ -146,7 +146,7 @@ def infer(net: nn.Module, infer_dataloader: DataLoader, loss_fn: loss) -> float:
             if train_on_gpu:
                 x, y = x.cuda(), y.cuda()
             y_pred, hidden = net(x)
-            infer_loss = loss_fn(input=np.clip(y_pred.reshape(-1), a_min=0, a_max=1), target=y.reshape(-1))
+            infer_loss = loss_fn(input=torch.clamp(y_pred.reshape(-1), min=0, max=1), target=y.reshape(-1))
         running_loss += infer_loss
     return running_loss / len(infer_dataloader)
 
@@ -171,9 +171,12 @@ if __name__ == '__main__':
     net = AgentGRU(input_size=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers)
     optimizer = torch.optim.Adam(params=net.parameters(), lr=lr, weight_decay=1e-3)
     loss_fn = nn.BCELoss()
-
+    print('Starting After 11 Epoches !')
+    net = load_pt_model(input_size=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers)
     print(net)
     net = train(net=net, train_dataloader=train_dataloader, val_dataloader=val_dataloader,
                 test_dataloader=test_dataloader, is_earlystopping=True)
     print(f'Final Test Loss: {infer(net=net, infer_dataloader=test_dataloader, loss_fn=loss_fn):.2f}')
+
+    
     save_pt_model(net=net)

@@ -31,7 +31,7 @@ class AgentGRU(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
 
-        self.gru = nn.GRU(input_size=input_size, hidden_size=hidden_dim, num_layers=num_layers)  # , batch_first=True)
+        self.gru = nn.GRU(input_size=input_size, hidden_size=hidden_dim, num_layers=num_layers, batch_first=True)
         self.dropout = nn.Dropout(p=0.5)
         self.relu = nn.ReLU()
         self.fc = nn.Linear(hidden_dim, output_dim)
@@ -40,15 +40,14 @@ class AgentGRU(nn.Module):
         """
         Forward pass of the net
         """
-        x = x.permute(1, 0, 2)
         if not hidden:
-            h = self.init_params(x.size(1))
+            h = self.init_params(x.size(0))
         else:
             h = hidden
         # print(f'x: {x.shape}, h: {h.shape}')
         out, hidden = self.gru(x, h.detach())
         # out = self.dropout(out)
-        out = self.fc(out[-1, :, :])  # Fully Connected on the last timestamp
+        out = self.fc(out[:, -1, :])  # Fully Connected on the last timestamp
         out = self.relu(out)
         return out, hidden
 
@@ -153,10 +152,11 @@ def infer(net: nn.Module, infer_dataloader: DataLoader, loss_fn: loss) -> float:
 
 if __name__ == '__main__':
     """
-    Usage of focal loss - https://discuss.pytorch.org/t/is-this-a-correct-implementation-for-focal-loss-in-pytorch/43327/6
-    Try to use bidirectional model
+    # TODO - Usage of focal loss - https://discuss.pytorch.org/t/is-this-a-correct-implementation-for-focal-loss-in-pytorch/43327/6
+    # TODO - Try to use bidirectional model
     """
     X, y = load_X_y_from_disk(num_features=1)
+    print(X.shape)
     x_train, x_val, x_test, y_train, y_val, y_test = _split_to_train_validation_test(X=X, y=y,
                                                                                      train_ratio=train_ratio,
                                                                                      validation_ratio=validation_ratio)
@@ -171,12 +171,12 @@ if __name__ == '__main__':
     net = AgentGRU(input_size=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers)
     optimizer = torch.optim.Adam(params=net.parameters(), lr=lr, weight_decay=1e-3)
     loss_fn = nn.BCELoss()
-    print('Starting After 11 Epoches !')
-    net = load_pt_model(input_size=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers)
+    # print('Starting After 11 Epoches !')
+    # net = load_pt_model(input_size=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers)
     print(net)
     net = train(net=net, train_dataloader=train_dataloader, val_dataloader=val_dataloader,
                 test_dataloader=test_dataloader, is_earlystopping=True)
     print(f'Final Test Loss: {infer(net=net, infer_dataloader=test_dataloader, loss_fn=loss_fn):.2f}')
 
-    
+
     save_pt_model(net=net)

@@ -51,22 +51,37 @@ def check_earlystopping(loss: np.array, epoch: int, min_improvement: float = MIN
                                 loss[epoch - patient_num_epochs:epoch]) >= min_improvement, 1, 0)) == 0
 
 
-def convert_probs_to_preds(probs: np.array, threshold: float = 0.7) -> np.array:
+def convert_probs_to_preds(probs: np.array, threshold: float = 0.5) -> np.array:
     """
     Convert probabilities into labels by a given threshold. Probabilities above the threshold will be 1, otherwise 0.
     """
     return np.where(probs >= threshold, 1, 0)
 
+def get_num_of_areas_and_targets_from_arary(array: np.array, verbose: bool = True) -> Tuple[int, int]:
+    """
+    Calculate number of different Areas the array is working on and how many targets in total
+    """
+    num_of_areas, num_of_targets = array.shape[0], array.sum()
+    if verbose:
+        print(f'Num of Areas: {num_of_areas}; Num of total real targets: {num_of_targets}')
+    return num_of_areas, num_of_targets
 
-def calculate_metrics(y_true: np.array, y_pred: np.array) -> Tuple[float, float, float, float]:
+
+def calculate_model_metrics(y_true: np.array, y_pred: np.array, verbose: bool = True, mode:str='Test') -> Tuple[
+    float, float, float, float]:
     """
     Calculating Accuracy, recall, precision, f1-score
     """
     y_pred = convert_probs_to_preds(probs=y_pred)
+    y_true, y_pred = y_true.reshape(-1), y_pred.reshape(-1)
     accuracy = accuracy_score(y_true=y_true, y_pred=y_pred)
     recall = recall_score(y_true=y_true, y_pred=y_pred)
     precision = precision_score(y_true=y_true, y_pred=y_pred)
     f1score = f1_score(y_true=y_true, y_pred=y_pred)
+    if verbose:
+        print(f'*** {mode} ***')
+        print(f'Accuracy: {accuracy * 100:.2f}%; Recall: {recall * 100:.2f}%; Precision: {precision * 100:.2f}%')
+
     return accuracy, recall, precision, f1score
 
 
@@ -103,6 +118,7 @@ def _split_to_train_validation_test(X: np.array, y: np.array, train_ratio: float
     return X[:train_len], X[train_len:train_len + validation_len], X[train_len + validation_len:], y[:train_len], \
            y[train_len:train_len + validation_len], y[train_len + validation_len:]
 
+
 class TargetsDataset(Dataset):
     """
     The dataset object used to read the data
@@ -119,8 +135,10 @@ class TargetsDataset(Dataset):
     def __len__(self):
         return self.labels.shape[0]
 
+
 def get_dataloader_for_datasets(x_train: np.array, x_val: np.array, x_test: np.array, y_train: np.array,
-                                y_val: np.array, y_test: np.array, batch_size: int=256) -> Tuple[DataLoader, DataLoader, DataLoader]:
+                                y_val: np.array, y_test: np.array, batch_size: int = 256) -> Tuple[
+    DataLoader, DataLoader, DataLoader]:
     """
     The length of the data-loaders are number of samples in X divided to batch size (X.shape[0] / batch_size))
     """
@@ -128,6 +146,7 @@ def get_dataloader_for_datasets(x_train: np.array, x_val: np.array, x_test: np.a
     val_dataloader = DataLoader(TargetsDataset(features=x_val, labels=y_val), batch_size=batch_size)
     test_dataloader = DataLoader(TargetsDataset(features=x_test, labels=y_test), batch_size=batch_size)
     return train_dataloader, val_dataloader, test_dataloader
+
 
 def plot_values_by_epochs(train_values: np.array, validation_values: np.array = None, test_values: np.array = None,
                           title: str = 'Loss VS Epoch') -> None:

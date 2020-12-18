@@ -4,7 +4,9 @@ import h5py
 import os
 import numpy as np
 from matplotlib import pyplot as plt
+from prettytable import PrettyTable
 import torch
+from torch import nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import accuracy_score, recall_score, precision_score
 from consts import FILES_PATH, MIN_IMPROVEMENT, PATIENT_NUM_EPOCHS, TRAIN_RATIO, VALIDATION_RATIO, BATCH_SIZE
@@ -174,6 +176,18 @@ def plot_values_by_epochs(train_values: np.array, validation_values: np.array = 
     plt.ylabel('Value')
     plt.show()
 
+
+def count_parameters(net: nn.Module) -> None:
+    table = PrettyTable(["Modules", "Parameters"])
+    total_params = 0
+    for name, parameter in net.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        param = parameter.numel() # Get number of elements in tensor
+        table.add_row([name, param])
+        total_params += param
+    print(table)
+    print(f"Total Trainable Params: {total_params}")
 
 def print_data_statistics(x_train: np.array, x_val: np.array, x_test: np.array, y_train: np.array, y_val: np.array,
                           y_test: np.array) -> None:

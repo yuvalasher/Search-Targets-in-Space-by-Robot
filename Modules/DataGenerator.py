@@ -1,5 +1,5 @@
 from typing import List, Tuple, Union, Any
-from utils import Location, CONFIG_PATH
+from consts import Location, CONFIG_PATH
 from utils import save_hdf5_to_file, load_hdf5_file
 from Area import Area
 import Agent
@@ -95,14 +95,20 @@ class DataGenerator:
     def tabulate_matrix(matrix: np.array):
         print(tabulate(matrix, headers=[*list(range(config['PARAMS'].getint('N')))], tablefmt='github', showindex=True))
 
-    def _get_generated_params_for_sequence(self) -> Tuple[Any, Area, int, List[Location]]:
+    def _get_generated_params_for_sequence(self, random_num_targets:bool=True) -> Tuple[Any, Area, int, List[Location]]:
         """
         Used for generating the parameters for the X data generation as agent location, number of targets,
         location of the targets, etc.
+        If random_num_targets is True -> generating num of targets from 1 to N
         :return: agent, area, num_of_targets, targets_location
         """
         params = config["PARAMS"]
-        targets_locations = Area.generate_targets(params.getint('NUM_TARGETS'))
+        if random_num_targets:
+            num_targets = np.random.randint(1, params.getint('N'))
+        else:
+            num_targets = params.getint('NUM_TARGETS')
+        targets_locations = Area.generate_targets(num_targets=num_targets)
+
         area = Area(num_cells_axis=params.getint('N'), t_interval=params.getint('T_INTERVAL'),
                     pta=params.getfloat('pta'), alpha=params.getfloat('alpha'),
                     targets_locations=targets_locations)
@@ -128,31 +134,33 @@ class DataGenerator:
         Each sequence is a new Area with agent and targets
         :return: X - shape: (NXN, num_features) ; y - shape: (NXN)
         """
-        data = np.empty((seq_len, area.num_cells_axis * area.num_cells_axis, num_features))
-        rij = area.calculate_distance(agent_location=agent.current_location,
-                                      cells_indices=np.indices(area.cells.shape, sparse=True)).reshape(-1, 1)
+        data = np.empty((seq_len, 2 * area.num_cells_axis * area.num_cells_axis, num_features))
+        # rij = area.calculate_distance(agent_location=agent.current_location,
+        #                               cells_indices=np.indices(area.cells.shape, sparse=True)).reshape(-1, 1)
+        rij = np.zeros((area.num_cells_axis * area.num_cells_axis, 1))
+        np.put(rij, agent.current_location[0] * area.num_cells_axis + agent.current_location[1], 1)  # One-Hot Vector where the agent exist
         for seq_num in range(seq_len):
             X = DataGenerator.simulate_agent_receive_signals(agent=agent, area=area)
-            data[seq_num] = np.concatenate((X, rij), axis=1)
+            data[seq_num] = np.vstack([X, rij])
         y = area.cells.reshape(-1)
         return data, y
 
-    def time_series_data_generation(self, num_sequences: int = 1000, seq_len: int = 100, num_features: int = 2,
-                                    train_ratio: float = 0.7, validation_ratio: float = 0.15):
+    def time_series_data_generation(self, num_sequences: int = 1000, seq_len: int = 100, num_features: int = 1,
+                                    TRAIN_RATIO: float = 0.7, validation_ratio: float = 0.15):
         """
         Running the data generation - Creation of num_sequences (each sequence with seq_len length)
         Features are:   1) The X matrix (signal received from the target)
                         2) The distance of the agent from the cell
         """
         area_size = config['PARAMS'].getint('N') * config['PARAMS'].getint('N')
-        X = np.empty((num_sequences, seq_len, area_size, num_features))
+        X = np.empty((num_sequences, seq_len, 2 * area_size, num_features))
         y = np.empty((num_sequences, area_size))
         for seq_num in tqdm(range(num_sequences)):
             agent, area, num_targets, targets_locations = self._get_generated_params_for_sequence()
             X[seq_num], y[seq_num] = self._get_sequence(seq_len=seq_len, area=area, agent=agent,
                                                         num_features=num_features)
-        save_hdf5_to_file('X', X)
-        save_hdf5_to_file('y', y)
+        save_hdf5_to_file('X_10000_100', X)
+        save_hdf5_to_file('y_10000_100', y)
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
-from utils import Location, CONFIG_PATH
-from utils import save_pickle_object, NOISE
+from consts import Location, CONFIG_PATH, NOISE
+from utils import save_pickle_object
 import Area
 from DataGenerator import DataGenerator
 import numpy as np

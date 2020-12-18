@@ -1,5 +1,5 @@
 from typing import List, Tuple
-from utils import Location, CONFIG_PATH
+from consts import Location, CONFIG_PATH
 from dataclasses import dataclass
 import numpy as np
 from configparser import ConfigParser

@@ -2,16 +2,16 @@ from typing import Tuple
 from pathlib import Path
 
 # AgentGRU Training Consts
-NUM_EPOCHS: int = 30
-train_ratio: float = 0.7
-validation_ratio: float = 0.15
-test_ratio: float = 0.15
-hidden_dim: int = 32
-num_layers: int = 2
+NUM_EPOCHS: int = 4
+TRAIN_RATIO: float = 0.7
+VALIDATION_RATIO: float = 0.15
+TEST_RATIO: float = 0.15
+hidden_dim: int = 100
+num_layers: int = 1
 lr: float = 1e-3
-batch_size: int = 256
-PRINT_EVERY: int = 5
-SAVE_EVERY: int = 5
+BATCH_SIZE: int = 50
+PRINT_EVERY: int = 1
+SAVE_EVERY: int = 10
 
 Location = Tuple[int, int]
 CONFIG_PATH: Path = Path('config.cfg')

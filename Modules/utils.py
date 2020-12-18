@@ -5,10 +5,9 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 import torch
-from torch import nn
 from torch.utils.data import Dataset, DataLoader
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, confusion_matrix
-from consts import FILES_PATH, MIN_IMPROVEMENT, PATIENT_NUM_EPOCHS
+from sklearn.metrics import accuracy_score, recall_score, precision_score
+from consts import FILES_PATH, MIN_IMPROVEMENT, PATIENT_NUM_EPOCHS, TRAIN_RATIO, VALIDATION_RATIO, BATCH_SIZE
 
 
 def save_pickle_object(obj_name: str, obj: Any) -> None:
@@ -57,54 +56,62 @@ def convert_probs_to_preds(probs: np.array, threshold: float = 0.5) -> np.array:
     """
     return np.where(probs >= threshold, 1, 0)
 
+
 def get_num_of_areas_and_targets_from_arary(array: np.array, verbose: bool = True) -> Tuple[int, int]:
     """
     Calculate number of different Areas the array is working on and how many targets in total
     """
     num_of_areas, num_of_targets = array.shape[0], array.sum()
     if verbose:
-        print(f'Num of Areas: {num_of_areas}; Num of total real targets: {num_of_targets}')
+        print(f'Num of Areas: {num_of_areas}; Num of real targets: {int(num_of_targets)}')
     return num_of_areas, num_of_targets
 
 
-def calculate_model_metrics(y_true: np.array, y_pred: np.array, verbose: bool = True, mode:str='Test') -> Tuple[
-    float, float, float, float]:
+def calculate_model_metrics(y_true: np.array, y_pred: np.array, verbose: bool = True, mode: str = 'Test') -> Tuple[
+    float, float, float]:
     """
-    Calculating Accuracy, recall, precision, f1-score
+    Calculating Accuracy, recall, precision
     """
+    if type(y_true) == torch.tensor:
+        y_true = y_true.detach().numpy()
     y_pred = convert_probs_to_preds(probs=y_pred)
     y_true, y_pred = y_true.reshape(-1), y_pred.reshape(-1)
+    assert y_true.shape == y_pred.shape
     accuracy = accuracy_score(y_true=y_true, y_pred=y_pred)
-    recall = recall_score(y_true=y_true, y_pred=y_pred)
-    precision = precision_score(y_true=y_true, y_pred=y_pred)
-    f1score = f1_score(y_true=y_true, y_pred=y_pred)
+    recall = recall_score(y_true=y_true, y_pred=y_pred)  # , average='samples')
+    precision = precision_score(y_true=y_true, y_pred=y_pred)  # , average=='samples')
     if verbose:
         print(f'*** {mode} ***')
+        print(f'Num of found targets: {(y_pred[np.where(y_true == 1)[0]] == 1).sum()} / {int(y_true.sum())}')
         print(f'Accuracy: {accuracy * 100:.2f}%; Recall: {recall * 100:.2f}%; Precision: {precision * 100:.2f}%')
 
-    return accuracy, recall, precision, f1score
+    return accuracy, recall, precision
 
 
-def load_X_y_from_disk(num_features: int = 2, max_size: int = None) -> Tuple[np.array, np.array]:
+def load_data(train_ratio: float = TRAIN_RATIO, validation_ratio: float = VALIDATION_RATIO):
     """
-    :param num_features: Decide if taking all the features of just the first (X vector)
+    Loading data from disk
+    :return: arrays of X, y for both train, validation and test sets.
     """
-    X, y = load_hdf5_file('X'), load_hdf5_file('y')
+    X, y = load_X_y_from_disk()
+    x_train, x_val, x_test, y_train, y_val, y_test = split_to_train_validation_test(X=X, y=y,
+                                                                                    train_ratio=train_ratio,
+                                                                                    validation_ratio=validation_ratio)
+    return x_train, x_val, x_test, y_train, y_val, y_test
 
-    if num_features == 1:
-        X = X[:, :, :, 0]
-        if max_size:
-            X = X[:max_size, :, :]
-            y = y[:max_size, :]
-    else:
-        if max_size:
-            X = X[:max_size, :, :, :]
-            y = y[:max_size, :]
+
+def load_X_y_from_disk(max_size: int = None) -> Tuple[np.array, np.array]:
+    X, y = load_hdf5_file('X_10000_100'), load_hdf5_file('y_10000_100')
+
+    X = X[:, :, :, 0]
+    if max_size:
+        X = X[:max_size, :, :]
+        y = y[:max_size, :]
     return X, y
 
 
-def _split_to_train_validation_test(X: np.array, y: np.array, train_ratio: float = 0.7,
-                                    validation_ratio: float = 0.15) -> \
+def split_to_train_validation_test(X: np.array, y: np.array, train_ratio: float = TRAIN_RATIO,
+                                   validation_ratio: float = VALIDATION_RATIO) -> \
         Tuple[np.array, np.array, np.array, np.array, np.array, np.array]:
     """
     Splitting the data based on the ratio of the different types of data (train, validation, test)
@@ -137,7 +144,7 @@ class TargetsDataset(Dataset):
 
 
 def get_dataloader_for_datasets(x_train: np.array, x_val: np.array, x_test: np.array, y_train: np.array,
-                                y_val: np.array, y_test: np.array, batch_size: int = 256) -> Tuple[
+                                y_val: np.array, y_test: np.array, batch_size: int = BATCH_SIZE) -> Tuple[
     DataLoader, DataLoader, DataLoader]:
     """
     The length of the data-loaders are number of samples in X divided to batch size (X.shape[0] / batch_size))
@@ -165,3 +172,11 @@ def plot_values_by_epochs(train_values: np.array, validation_values: np.array = 
     plt.xlabel('Epoch')
     plt.ylabel('Value')
     plt.show()
+
+
+def print_data_statistics(x_train: np.array, x_val: np.array, x_test: np.array, y_train: np.array, y_val: np.array,
+                          y_test: np.array) -> None:
+    print(x_train.shape, x_val.shape, x_test.shape, y_train.shape, y_val.shape, y_test.shape)
+    print(f'Num Train of targets: {int(y_train.sum())}')
+    print(f'Num Val of targets: {int(y_val.sum())}')
+    print(f'Num Test of targets: {int(y_test.sum())}')

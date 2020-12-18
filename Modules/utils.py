@@ -101,7 +101,8 @@ def load_data(train_ratio: float = TRAIN_RATIO, validation_ratio: float = VALIDA
 
 
 def load_X_y_from_disk(max_size: int = None) -> Tuple[np.array, np.array]:
-    X, y = load_hdf5_file('X_10000_100'), load_hdf5_file('y_10000_100')
+    X, y = load_hdf5_file('X'), load_hdf5_file('y')
+    # X, y = load_hdf5_file('X_10000_100'), load_hdf5_file('y_10000_100')
 
     X = X[:, :, :, 0]
     if max_size:

@@ -2,7 +2,7 @@ from typing import Tuple
 from pathlib import Path
 
 # AgentGRU Training Consts
-NUM_EPOCHS: int = 4
+NUM_EPOCHS: int = 100
 TRAIN_RATIO: float = 0.7
 VALIDATION_RATIO: float = 0.15
 TEST_RATIO: float = 0.15

@@ -103,8 +103,7 @@ def load_data(train_ratio: float = TRAIN_RATIO, validation_ratio: float = VALIDA
 
 
 def load_X_y_from_disk(max_size: int = None) -> Tuple[np.array, np.array]:
-    X, y = load_hdf5_file('X'), load_hdf5_file('y')
-    # X, y = load_hdf5_file('X_10000_100'), load_hdf5_file('y_10000_100')
+    X, y = load_hdf5_file('X_10000_100'), load_hdf5_file('y_10000_100')
 
     X = X[:, :, :, 0]
     if max_size:
@@ -177,15 +176,14 @@ def plot_values_by_epochs(train_values: np.array, validation_values: np.array = 
     plt.show()
 
 
-def count_parameters(net: nn.Module) -> None:
+def print_model_parameters_count(net: nn.Module) -> None:
     table = PrettyTable(["Modules", "Parameters"])
     total_params = 0
     for name, parameter in net.named_parameters():
-        if not parameter.requires_grad:
-            continue
-        param = parameter.numel() # Get number of elements in tensor
-        table.add_row([name, param])
-        total_params += param
+        if parameter.requires_grad:
+            param = parameter.numel() # Get number of elements in tensor
+            table.add_row([name, param])
+            total_params += param
     print(table)
     print(f"Total Trainable Params: {total_params}")
 

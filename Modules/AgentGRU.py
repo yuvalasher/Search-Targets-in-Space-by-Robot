@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 from utils import load_hdf5_file, plot_values_by_epochs, check_earlystopping, load_X_y_from_disk, \
     split_to_train_validation_test, get_dataloader_for_datasets, calculate_model_metrics, \
-    get_num_of_areas_and_targets_from_arary, load_data, save_pickle_object, print_data_statistics, count_parameters
+    get_num_of_areas_and_targets_from_arary, load_data, save_pickle_object, print_data_statistics, print_model_parameters_count
 
 from consts import NUM_EPOCHS, TRAIN_RATIO, VALIDATION_RATIO, TEST_RATIO, hidden_dim, num_layers, lr, BATCH_SIZE, \
     PRINT_EVERY, SAVE_EVERY
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     """
     # TODO - Try to use bidirectional model
     """
-    TRAINING_MODE = True
+    TRAINING_MODE = False
     print(
         '**************** Train Mode ****************' if TRAINING_MODE else '**************** Test Mode ****************')
 
@@ -176,7 +176,7 @@ if __name__ == '__main__':
         net = load_pt_model(input_size=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers)
         print(net)
 
-    count_parameters(net)
+    print_model_parameters_count(net)
     test_loss, y_test_pred = infer(net=net, infer_dataloader=test_dataloader, loss_fn=loss_fn)
     print(f'Final Test Loss: {test_loss:.2f}')
     print(f'Number of Epochs: {NUM_EPOCHS}')

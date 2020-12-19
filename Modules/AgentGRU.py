@@ -2,12 +2,12 @@ import torch
 from torch import nn
 from torch.nn.modules import loss
 from torch.utils.data import DataLoader
-from typing import Tuple, Dict, Any
+from typing import Tuple
 import numpy as np
 from tqdm import tqdm
 from utils import load_hdf5_file, plot_values_by_epochs, check_earlystopping, load_X_y_from_disk, \
     split_to_train_validation_test, get_dataloader_for_datasets, calculate_model_metrics, \
-    get_num_of_areas_and_targets_from_arary, load_data, save_pickle_object, print_data_statistics
+    get_num_of_areas_and_targets_from_arary, load_data, save_pickle_object, print_data_statistics, count_parameters
 
 from consts import NUM_EPOCHS, TRAIN_RATIO, VALIDATION_RATIO, TEST_RATIO, hidden_dim, num_layers, lr, BATCH_SIZE, \
     PRINT_EVERY, SAVE_EVERY
@@ -145,11 +145,12 @@ def infer(net: nn.Module, infer_dataloader: DataLoader, loss_fn: loss) -> Tuple[
     return running_loss / len(infer_dataloader), torch.cat(tuple(y_infer_pred))
 
 
+
 if __name__ == '__main__':
     """
     # TODO - Try to use bidirectional model
     """
-    TRAINING_MODE = False
+    TRAINING_MODE = True
     print(
         '**************** Train Mode ****************' if TRAINING_MODE else '**************** Test Mode ****************')
 
@@ -175,6 +176,8 @@ if __name__ == '__main__':
         net = load_pt_model(input_size=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers)
         print(net)
 
+    count_parameters(net)
     test_loss, y_test_pred = infer(net=net, infer_dataloader=test_dataloader, loss_fn=loss_fn)
     print(f'Final Test Loss: {test_loss:.2f}')
+    print(f'Number of Epochs: {NUM_EPOCHS}')
     calculate_model_metrics(y_true=y_test, y_pred=y_test_pred)

@@ -87,7 +87,6 @@ def train(net: nn.Module, train_dataloader: DataLoader = None, val_dataloader: D
             loss = loss_fn(y_train_pred, y_train)
             loss.backward()
             optimizer.step()
-        _, _, _ = calculate_model_metrics(y_true=y_train, y_pred=y_train_pred, mode='Train')
 
         if val_dataloader:
             val_loss, y_val_pred = infer(net, val_dataloader, loss_fn)

@@ -98,6 +98,7 @@ def train(net: nn.Module, train_dataloader: DataLoader = None, val_dataloader: D
             best_epoch = np.argmin(val_losses[:epoch + 1])
             break
         train_losses[epoch] = loss.item() / len(train_dataloader)
+        scheduler.step(val_loss) # Change the lr if needed based on the validation loss
 
         if epoch % PRINT_EVERY == 0:
             print(f"Epoch: {epoch + 1}/{NUM_EPOCHS},",
@@ -150,7 +151,7 @@ if __name__ == '__main__':
     """
     # TODO - Try to use bidirectional model
     """
-    TRAINING_MODE = False
+    TRAINING_MODE = True
     print(
         '**************** Train Mode ****************' if TRAINING_MODE else '**************** Test Mode ****************')
 
@@ -166,6 +167,7 @@ if __name__ == '__main__':
 
     net = AgentGRU(input_size=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers)
     optimizer = torch.optim.Adam(params=net.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min') # Reduce lr while the loss is stuck
     loss_fn = nn.BCELoss()
 
     if TRAINING_MODE:

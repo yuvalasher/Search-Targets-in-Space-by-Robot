@@ -1,12 +1,14 @@
 from typing import List, Tuple
-from utils import Location, CONFIG_PATH
+from consts import Location, CONFIG_PATH
 from dataclasses import dataclass
 import numpy as np
 from configparser import ConfigParser
 
 config = ConfigParser()
 config.read(CONFIG_PATH)
-np.random.seed(config['UTILS'].getint(('SEED')))
+
+
+# np.random.seed(config['UTILS'].getint(('SEED')))
 
 @dataclass
 class Area:
@@ -28,6 +30,8 @@ class Area:
         """
         Initialize self.cells as zeros matrix NxN and assigns 1 in targets locations
         The values of the matrix (1 locations) depended on targets_locations, so doing it after initialization
+        Converting List of Locations (targets' coordinates) to One Hot Encoding vector (NXN, 1)
+        of "1" if cell contains target or "0" if cell do not contain
         """
         self.cells = np.zeros((self.num_cells_axis, self.num_cells_axis))
         np.put(self.cells,
@@ -45,8 +49,13 @@ class Area:
     @staticmethod
     def generate_targets(num_targets: int) -> List[Location]:
         """
-        Randomize num_targets cells
-        TODO - Need to make it with np.random.choice without repeat
+        Randomize num_targets cells - without duplications of targets in cells
         """
-        return [(np.random.randint(config['PARAMS'].getint('N')), np.random.randint(config['PARAMS'].getint('N'))) for _ in
-                range(num_targets)]
+        targets_locations = []
+        num_generated_targets = 0
+        while num_generated_targets != num_targets:
+            location = tuple(np.random.choice(config['PARAMS'].getint('N'), 2))
+            if location not in targets_locations:
+                targets_locations.append(location)
+                num_generated_targets += 1
+        return targets_locations

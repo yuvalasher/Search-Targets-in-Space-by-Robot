@@ -108,8 +108,7 @@ env/
 venv/
 ENV/
 env.bak/
-venv.bak/
-
+venv.bak
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -132,7 +131,14 @@ dmypy.json
 *.md
 *.pdf
 *.csv
+*.docx
 *.pkl
+*.h5
 /.idea
 /Pickles
+/hdf5
 /Data
+playground.py
+/Models
+*.pt
+*.png
